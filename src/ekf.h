@@ -12,10 +12,9 @@ class ExtendedKalmanFilter{
                             const Eigen::MatrixXd &processNoise); //process noise
 
     pair<Eigen::VectorXd, Eigen::MatrixXd> predict(double dt, //Time Step
-                                                    const Eigen::VectorXd &imuLinearAcceleration, //Linear Acceleration input from IMU
-                                                    const Eigen::VectorXd &imuAngularVelocity, //Angular Velocity input from IMU
-                                                    const Eigen::Vector4d &quaternion, //Quaternion
-                                                    double g); //Gravity
+                                                const Eigen::VectorXd &imuLinearAcceleration, //Linear Acceleration input from IMU
+                                                const Eigen::VectorXd &imuAngularVelocity, //Angular Velocity input from IMU
+                                                double g); //Gravity
 
     pair<Eigen::VectorXd, Eigen::MatrixXd> update(const Eigen::VectorXd &measurement); //Measurement from GPS
 
@@ -24,7 +23,7 @@ class ExtendedKalmanFilter{
     Eigen::MatrixXd P; //Covariance
     Eigen::MatrixXd R; //Measurement Noise
     Eigen::MatrixXd Q; //Process Noise
-    Eigen::MatrixXd H; //Measurement Matrix
+    Eigen::MatrixXd H; //Jacobian of H
     Eigen::MatrixXd F; //State Transition Matrix
     Eigen::MatrixXd I; //Identity Matrix
     Eigen::VectorXd dState; //State Derivative
@@ -40,11 +39,11 @@ class ExtendedKalmanFilter{
     Eigen::MatrixXd JacobianF; //Jacobian of F
 
     Eigen::VectorXd computeStateDerivative(const Eigen::VectorXd &imuLinearAcceleration,
-                                            const Eigen::VectorXd &imuAngularVelocity,
-                                            double g);
+                                        const Eigen::VectorXd &imuAngularVelocity,
+                                        double g);
 
     Eigen::MatrixXd computeJacobianF(const Eigen::VectorXd &imuLinearAcceleration,
-                                        const Eigen::VectorXd &imuAngularVelocity);
+                                    const Eigen::VectorXd &imuAngularVelocity);
 
     Eigen::Matrix3d updateRotationMatrix(const Eigen::Vector4d &quaternion);
 };

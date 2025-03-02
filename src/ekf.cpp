@@ -4,121 +4,118 @@ ExtendedKalmanFilter::ExtendedKalmanFilter(const Eigen::VectorXd &initState, //i
                                             const Eigen::MatrixXd &initCov, //initCovariance
                                             const Eigen::MatrixXd &measurementNoise, //mesasurement noise
                                             const Eigen::MatrixXd &processNoise) //process noise
-:state(initState), P(initCov), R(measurementNoise), Q(processNoise) {
-    H = Eigen::MatrixXd::Zero(state.size(), state.size());
-    dState = Eigen::VectorXd::Zero(state.size());
-    JacobianF = Eigen::MatrixXd::Zero(state.size(), state.size());
-    I = Eigen::MatrixXd::Identity(state.size(), state.size());
-    RMatrix = Eigen::Matrix3d::Zero();
-}
+:state(initState), 
+P(initCov), 
+R(measurementNoise), 
+Q(processNoise),     
+H(Eigen::MatrixXd::Zero(state.size(), state.size())),
+dState(Eigen::VectorXd::Zero(state.size())),
+JacobianF(Eigen::MatrixXd::Zero(state.size(), state.size())),
+I(Eigen::MatrixXd::Identity(state.size(), state.size())),
+RMatrix(Eigen::Matrix3d::Identity()){}
 
 Eigen::Matrix3d ExtendedKalmanFilter::updateRotationMatrix(const Eigen::Vector4d &quaternion) {
 
-    double qx = quaternion(0);
-    double qy = quaternion(1);
-    double qz = quaternion(2);
-    double qw = quaternion(3);
-    
-    RMatrix(0, 0) = 1.0 - 2.0 * qy * qy - 2.0 * qz * qz;
-    RMatrix(0, 1) = 2.0 * qx * qy - 2.0 * qz * qw;
-    RMatrix(0, 2) = 2.0 * qx * qz + 2.0 * qy * qw;
-    RMatrix(1, 0) = 2.0 * qx * qy + 2.0 * qz * qw;
-    RMatrix(1, 1) = 1.0 - 2.0 * qx * qx - 2.0 * qz * qz;
-    RMatrix(1, 2) = 2.0 * qy * qz - 2.0 * qx * qw;
-    RMatrix(2, 0) = 2.0 * qx * qz - 2.0 * qy * qw;
-    RMatrix(2, 1) = 2.0 * qy * qz + 2.0 * qx * qw;
-    RMatrix(2, 2) = 1.0 - 2.0 * qx * qx - 2.0 * qy * qy;
+    double qw = quaternion(0);
+    double qx = quaternion(1);
+    double qy = quaternion(2);
+    double qz = quaternion(3);
 
-    return RMatrix;
+    this->RMatrix << 
+        1.0 - 2.0 * (qy * qy + qz * qz), 2.0 * (qx * qy - qz * qw), 2.0 * (qx * qz + qy * qw),
+        2.0 * (qx * qy + qz * qw), 1.0 - 2.0 * (qx * qx + qz * qz), 2.0 * (qy * qz - qx * qw),
+        2.0 * (qx * qz - qy * qw), 2.0 * (qy * qz + qx * qw), 1.0 - 2.0 * (qx * qx + qy * qy);
+
+    return this->RMatrix;
 }
 
 Eigen::VectorXd ExtendedKalmanFilter::computeStateDerivative(const Eigen::VectorXd &imuLinearAcceleration,
                                         const Eigen::VectorXd &imuAngularVelocity,
                                         double g) {
 
-    Eigen::Vector3d linearAcceleration = RMatrix * imuLinearAcceleration;
-    double px = state(0), py = state(1), pz = state(2);
-    double vx = state(3), vy = state(4), vz = state(5);
-    double qw = state(6), qx = state(7), qy = state(8), qz = state(9);
-
-    dState(0) = vx; // dpx/dt
-    dState(1) = vy; // dpy/dt
-    dState(2) = vz; // dpz/dt
-    dState(3) = linearAcceleration(0); // dvx/dt
-    dState(4) = linearAcceleration(1); // dvy/dt
-    dState(5) = linearAcceleration(2) + g; // dvz/dt
-    dState[6] = -0.5 * (qx * imuAngularVelocity[0] + qy * imuAngularVelocity[1] + qz * imuAngularVelocity[2]); // dq_w/dt
-    dState[7] = 0.5 * (qw * imuAngularVelocity[0] - qz * imuAngularVelocity[1] + qy * imuAngularVelocity[2]); // dq_x/dt
-    dState[8] = 0.5 * (qz * imuAngularVelocity[0] + qw * imuAngularVelocity[1] - qx * imuAngularVelocity[2]); // dq_y/dt
-    dState[9] = 0.5 * (-qy * imuAngularVelocity[0] + qx * imuAngularVelocity[1] + qw * imuAngularVelocity[2]); // dq_z/dt
+    Eigen::Vector3d linearAcceleration = this->RMatrix * imuLinearAcceleration;
     
-    return dState;
+    const double qw = state(6), qx = state(7), qy = state(8), qz = state(9);
+    const double wx = imuAngularVelocity[0], wy = imuAngularVelocity[1], wz = imuAngularVelocity[2];
+
+    this->dState.head<3>() = this->state.segment<3>(3); // dx/dt = vx, dy/dt = vy, dz/dt = vz
+    this->dState.segment<3>(3) = linearAcceleration + Eigen::Vector3d(0, 0, g); // dvx/dt = ax, dvy/dt = ay, dvz/dt = az
+
+    this->dState.segment<4>(6) <<
+        -0.5 * (qx * wx + qy * wy + qz * wz), // dq_w/dt
+        0.5 * (qw * wx - qz * wy + qy * wz), // dq_x/dt
+        0.5 * (qz * wx + qw * wy - qx * wz), // dq_y/dt
+        0.5 * (-qy * wx + qx * wy + qw * wz); // dq_z/dt
+    
+    return this->dState;
 }
 
 Eigen::MatrixXd ExtendedKalmanFilter::computeJacobianF(const Eigen::VectorXd &imuLinearAcceleration,
-                                const Eigen::VectorXd &imuAngularVelocity) {
+                                                        const Eigen::VectorXd &imuAngularVelocity) {
+
+    this->JacobianF.setZero();
+
+    this->JacobianF.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity(); // Position derivatives w.r.t velocity
     
-    double qx = state[6], qy = state[7], qz = state[8], qw = state[9];
+    const double qx = this->state[6], qy = this->state[7], qz = this->state[8], qw = this->state[9];
     double ax = imuLinearAcceleration[0], ay = imuLinearAcceleration[1], az = imuLinearAcceleration[2];
-    double wx = imuAngularVelocity[0], wy = imuAngularVelocity[1], wz = imuAngularVelocity[2];
+    
+    this->JacobianF.block<3, 4>(3, 6) <<
+        -2.0 * qz * ay + 2.0 * qy * az, 2.0 * qy * ay + 2.0 * qz * az, -4.0 * qy * ax + 2.0 * qx * ay + 2.0 * qw * az, -4.0 * qz * ax - 2.0 * qw * ay + 2.0 * qx * az,
+        2.0 * qz * ax - 2.0 * qx * az, 2.0 * qy * ax - 4.0 * qx * ay - 2.0 * qw * az, 2.0 * qx * ax + 2.0 * qz * az, 2.0 * qw * ax - 2.0 * qx * ay + 2.0 * qy * az,
+        -2.0 * qy * ax + 2.0 * qx * ay, 2.0 * qz * ax - 2.0 * qw * ay - 4.0 * qx * az, -2.0 * qw * ax + 2.0 * qz * ay - 4.0 * qy * az, 2.0 * qx * ax + 2.0 * qy * ay;
+    
+    const double wx = imuAngularVelocity[0], wy = imuAngularVelocity[1], wz = imuAngularVelocity[2];
 
-    JacobianF(0, 3) = 1.0; 
-    JacobianF(1, 4) = 1.0;
-    JacobianF(2, 5) = 1.0;
+    this->JacobianF.block<4, 3>(6, 6) <<
+        -0.5 * wx, -0.5 * wy, -0.5 * wz,
+        0.5 * wx,  0.5 * wz, -0.5 * wy,
+        0.5 * wy, -0.5 * wz,  0.5 * wx,
+        0.5 * wz,  0.5 * wy, -0.5 * wx;
 
-    JacobianF(3, 6) = -2.0 * qz * ay + 2.0 * qy * az;
-    JacobianF(3, 7) = 2.0 * qy * ay + 2.0 * qz * az;
-    JacobianF(3, 8) = -4.0 * qy * ax + 2.0 * qx * ay + 2.0 * qw * az;
-    JacobianF(3, 9) = -4.0 * qz * ax - 2.0 * qw * ay + 2.0 * qx * az;
-
-    JacobianF(4, 6) = 2.0 * qz * ax - 2.0 * qx * az;
-    JacobianF(4, 7) = 2.0 * qy * ax - 4.0 * qx * ay - 2.0 * qw * az;
-    JacobianF(4, 8) = 2.0 * qx * ax + 2.0 * qz * az;
-    JacobianF(4, 9) = 2.0 * qw * ax - 2.0 * qx * ay + 2.0 * qy * az;
-
-    JacobianF(5, 6) = -2.0 * qy * ax + 2.0 * qx * ay;
-    JacobianF(5, 7) = 2.0 * qz * ax - 2.0 * qw * ay - 4.0 * qx * az;
-    JacobianF(5, 8) = -2.0 * qw * ax + 2.0 * qz * ay - 4.0 * qy * az;
-    JacobianF(5, 9) = 2.0 * qx * ax + 2.0 * qy * ay;
-
-    JacobianF(6, 7) = -0.5 * wx;
-    JacobianF(6, 8) = -0.5 * wy;
-    JacobianF(6, 9) = -0.5 * wz;
-
-    JacobianF(7, 6) = 0.5 * wx;
-    JacobianF(7, 8) = 0.5 * wz;
-    JacobianF(7, 9) = -0.5 * wy;
-
-    JacobianF(8, 6) = 0.5 * wy;
-    JacobianF(8, 7) = -0.5 * wz;
-    JacobianF(8, 9) = 0.5 * wx;
-
-    JacobianF(9, 6) = 0.5 * wz;
-    JacobianF(9, 7) = 0.5 * wy;
-    JacobianF(9, 8) = -0.5 * wx;
-
-    return JacobianF;
+    return this->JacobianF;
 }
 
 pair<Eigen::VectorXd, Eigen::MatrixXd> ExtendedKalmanFilter::predict(double dt,
                                                                     const Eigen::VectorXd &imuLinearAcceleration, //Linear Acceleration input from IMU
                                                                     const Eigen::VectorXd &imuAngularVelocity,  //Angular Velocity input from IMU
-                                                                    const Eigen::Vector4d &quaternion, //Quaternion
                                                                     double g) //Gravity 
 {   
-    RMatrix = updateRotationMatrix(state.segment<4>(6)); //Update Rotation Matrix
-    dState = computeStateDerivative(imuLinearAcceleration, imuAngularVelocity, g); //Compute State Derivative
+    this->RMatrix = this->updateRotationMatrix(this->state.segment<4>(6)); //Update Rotation Matrix
+    this->dState = this->computeStateDerivative(imuLinearAcceleration, imuAngularVelocity, g); //Compute State Derivative
 
 
-    JacobianF = computeJacobianF(imuLinearAcceleration, imuAngularVelocity); //Compute Jacobian of F
-    F = I + JacobianF * dt;
+    this->JacobianF = this->computeJacobianF(imuLinearAcceleration, imuAngularVelocity); //Compute Jacobian of F
+    this->F = this->I + this->JacobianF * dt;
 
-    statePrior = state + dState * dt; // x' = x + dx * dt
-    statePrior.segment<4>(6) /= statePrior.segment<4>(6).norm(); //Normalize Quaternion
-    PPrior = F * P * F.transpose() + Q; // P' = FPF^T + Q
+    this->statePrior = this->state + this->dState * dt; // x' = x + dx * dt
+    
+    double norm_q = this->statePrior.segment<4>(6).norm();
+    if (norm_q > 1e-6) { this->statePrior.segment<4>(6) /= norm_q; } 
+    else { this->statePrior.segment<4>(6) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0); } // Normalize Quaternion
+    
+    this->PPrior = this->F * this->P * this->F.transpose() + this->Q; // P' = FPF^T + Q
 
-    state = statePrior;
-    P = PPrior;
+    this->state = this->statePrior;
+    this->P = this->PPrior;
 
-    return {state, P};
+    return {this->state, this->P};
+}
+
+pair<Eigen::VectorXd, Eigen::MatrixXd> ExtendedKalmanFilter::update(const Eigen::VectorXd &measurement){
+    
+    this->H.setZero();
+    this->H.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(); // Position 
+    this->H.block<3, 3>(7, 7) = Eigen::Matrix3d::Identity(); // Quaternion
+
+    this->S = this->R + this->H * this->P * this->H.transpose(); // S = HPH^T + R Measurement Covariance
+    this->K = this->P * this->H.transpose() * this->S.inverse(); // K = PH^TS^-1 Kalman Gain
+
+    this->statePosterior = this->state + this->K * (measurement - this->H * this->state); // x = x + K(z - Hx) Posterior State Estimate
+    this->PPosterior = (this->I - this->K * this->H) * this->P; // P = (I - KH)P Posterior Covariance
+
+    this->state = this->statePosterior;
+    this->P = this->PPosterior;
+
+    return {this->state, this->P};
 }
