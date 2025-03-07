@@ -8,7 +8,7 @@ ExtendedKalmanFilter::ExtendedKalmanFilter(const Eigen::VectorXd &initState, //i
 P(initCov), 
 R(measurementNoise), 
 Q(processNoise),     
-H(Eigen::MatrixXd::Zero(state.size(), state.size())),
+H(Eigen::MatrixXd::Zero(10, 10)),
 I(Eigen::MatrixXd::Identity(state.size(), state.size())),
 dState(Eigen::VectorXd::Zero(state.size())),
 RMatrix(Eigen::Matrix3d::Identity()),
@@ -107,13 +107,17 @@ pair<Eigen::VectorXd, Eigen::MatrixXd> ExtendedKalmanFilter::update(const Eigen:
     
     this->H.setZero();
     this->H.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(); // Position 
-    //this->H.block<3, 3>(7, 7) = Eigen::Matrix3d::Identity(); // Quaternion
+    this->H.block<4, 4>(6, 6) = Eigen::Matrix4d::Identity(); // Quaternion
 
     this->S = this->R + this->H * this->P * this->H.transpose(); // S = HPH^T + R Measurement Covariance
     this->K = this->P * this->H.transpose() * this->S.inverse(); // K = PH^TS^-1 Kalman Gain
 
     this->statePosterior = this->state + this->K * (measurement - this->H * this->state); // x = x + K(z - Hx) Posterior State Estimate
     this->PPosterior = (this->I - this->K * this->H) * this->P; // P = (I - KH)P Posterior Covariance
+
+    double norm_q = this->statePosterior.segment<4>(6).norm();
+    if (norm_q > 1e-6) { this->statePosterior.segment<4>(6) /= norm_q; }
+    else { this->statePosterior.segment<4>(6) = Eigen::Vector4d(1.0, 0.0, 0.0, 0.0); } // Normalize Quaternion
 
     this->state = this->statePosterior;
     this->P = this->PPosterior;

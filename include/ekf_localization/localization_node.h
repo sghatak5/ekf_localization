@@ -15,13 +15,16 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imuSub_;
     rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gpsSub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr posePub_;
+    rclcpp::TimerBase::SharedPtr timer_;
     ExtendedKalmanFilter ekf_;
     rclcpp::Time lastImuTime_;
     bool originSet_;
     double refLat_, refLon_, refAlt_;
+    Eigen::Vector4d imuOrientation;
 
     void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
     void gpsCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg);
+    void timerCallback();
 };
 
 

@@ -11,7 +11,12 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
 
-add_executable(ekf_localization src/ekf.cpp src/localization_node.cpp src/main.cpp)
+add_executable(ekf_localization 
+  src/ekf.cpp 
+  src/localization_node.cpp 
+  src/main.cpp
+  src/utilities/wgs84ToNed.cpp 
+)
 
 ament_target_dependencies(ekf_localization PUBLIC
   rclcpp 
