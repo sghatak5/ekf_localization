@@ -1,7 +1,7 @@
 #ifndef EKF_H
 #define EKF_H
 
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 using namespace std;
 
 class ExtendedKalmanFilter{
@@ -17,7 +17,9 @@ class ExtendedKalmanFilter{
                                                 double g); //Gravity
 
     pair<Eigen::VectorXd, Eigen::MatrixXd> update(const Eigen::VectorXd &measurement); //Measurement from GPS
-
+    
+    const Eigen::VectorXd& getState() const; //Get State
+    
     private:
     Eigen::VectorXd state; //State
     Eigen::MatrixXd P; //Covariance
@@ -29,12 +31,12 @@ class ExtendedKalmanFilter{
     Eigen::VectorXd dState; //State Derivative
     
     Eigen::Matrix3d RMatrix; //Rotation Matrix
-    Eigen::MatrixXd statePrior; //State Prior
+    Eigen::VectorXd statePrior; //State Prior
     Eigen::MatrixXd PPrior; //Covariance Prior
     Eigen::MatrixXd K; //Kalman Gain
     Eigen::MatrixXd S; //Innovation Covariance
     Eigen::MatrixXd y; //Innovation
-    Eigen::MatrixXd statePosterior; //State Posterior
+    Eigen::VectorXd statePosterior; //State Posterior
     Eigen::MatrixXd PPosterior; //Covariance Posterior
     Eigen::MatrixXd JacobianF; //Jacobian of F
 

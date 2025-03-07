@@ -1,4 +1,4 @@
-#include "ekf.h"
+#include "ekf_localization/ekf.h"
 
 ExtendedKalmanFilter::ExtendedKalmanFilter(const Eigen::VectorXd &initState, //initState
                                             const Eigen::MatrixXd &initCov, //initCovariance
@@ -9,10 +9,11 @@ P(initCov),
 R(measurementNoise), 
 Q(processNoise),     
 H(Eigen::MatrixXd::Zero(state.size(), state.size())),
-dState(Eigen::VectorXd::Zero(state.size())),
-JacobianF(Eigen::MatrixXd::Zero(state.size(), state.size())),
 I(Eigen::MatrixXd::Identity(state.size(), state.size())),
-RMatrix(Eigen::Matrix3d::Identity()){}
+dState(Eigen::VectorXd::Zero(state.size())),
+RMatrix(Eigen::Matrix3d::Identity()),
+JacobianF(Eigen::MatrixXd::Zero(state.size(), state.size())){}
+
 
 Eigen::Matrix3d ExtendedKalmanFilter::updateRotationMatrix(const Eigen::Vector4d &quaternion) {
 
@@ -106,7 +107,7 @@ pair<Eigen::VectorXd, Eigen::MatrixXd> ExtendedKalmanFilter::update(const Eigen:
     
     this->H.setZero();
     this->H.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(); // Position 
-    this->H.block<3, 3>(7, 7) = Eigen::Matrix3d::Identity(); // Quaternion
+    //this->H.block<3, 3>(7, 7) = Eigen::Matrix3d::Identity(); // Quaternion
 
     this->S = this->R + this->H * this->P * this->H.transpose(); // S = HPH^T + R Measurement Covariance
     this->K = this->P * this->H.transpose() * this->S.inverse(); // K = PH^TS^-1 Kalman Gain
@@ -118,4 +119,8 @@ pair<Eigen::VectorXd, Eigen::MatrixXd> ExtendedKalmanFilter::update(const Eigen:
     this->P = this->PPosterior;
 
     return {this->state, this->P};
+}
+
+const Eigen::VectorXd& ExtendedKalmanFilter::getState() const {
+    return this->state;
 }
