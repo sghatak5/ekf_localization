@@ -31,22 +31,21 @@ Eigen::Matrix3d ExtendedKalmanFilter::updateRotationMatrix(const Eigen::Vector4d
 }
 
 Eigen::VectorXd ExtendedKalmanFilter::computeStateDerivative(const Eigen::VectorXd &imuLinearAcceleration,
-                                        const Eigen::VectorXd &imuAngularVelocity,
-                                        double g) {
+                                                             const Eigen::VectorXd &imuAngularVelocity,
+                                                             double g) 
+    {
+    Eigen::Vector3d linearAcceleration = this->RMatrix * imuLinearAcceleration + Eigen::Vector3d(0, 0, g);  // Assume IMU includes gravity
+    this->dState.segment<3>(3) = linearAcceleration;
 
-    Eigen::Vector3d linearAcceleration = this->RMatrix * imuLinearAcceleration;
-    
     const double qw = state(6), qx = state(7), qy = state(8), qz = state(9);
     const double wx = imuAngularVelocity[0], wy = imuAngularVelocity[1], wz = imuAngularVelocity[2];
 
-    this->dState.head<3>() = this->state.segment<3>(3); // dx/dt = vx, dy/dt = vy, dz/dt = vz
-    this->dState.segment<3>(3) = linearAcceleration + Eigen::Vector3d(0, 0, g); // dvx/dt = ax, dvy/dt = ay, dvz/dt = az
-
+    this->dState.head<3>() = this->state.segment<3>(3);
     this->dState.segment<4>(6) <<
-        -0.5 * (qx * wx + qy * wy + qz * wz), // dq_w/dt
-        0.5 * (qw * wx - qz * wy + qy * wz), // dq_x/dt
-        0.5 * (qz * wx + qw * wy - qx * wz), // dq_y/dt
-        0.5 * (-qy * wx + qx * wy + qw * wz); // dq_z/dt
+        -0.5 * (qx * wx + qy * wy + qz * wz),
+        0.5 * (qw * wx - qz * wy + qy * wz),
+        0.5 * (qz * wx + qw * wy - qx * wz),
+        0.5 * (-qy * wx + qx * wy + qw * wz);
     
     return this->dState;
 }
@@ -107,6 +106,7 @@ pair<Eigen::VectorXd, Eigen::MatrixXd> ExtendedKalmanFilter::update(const Eigen:
     
     this->H.setZero();
     this->H.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity(); // Position 
+    this->H.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity();
     this->H.block<4, 4>(6, 6) = Eigen::Matrix4d::Identity(); // Quaternion
 
     this->S = this->R + this->H * this->P * this->H.transpose(); // S = HPH^T + R Measurement Covariance
@@ -127,4 +127,12 @@ pair<Eigen::VectorXd, Eigen::MatrixXd> ExtendedKalmanFilter::update(const Eigen:
 
 const Eigen::VectorXd& ExtendedKalmanFilter::getState() const {
     return this->state;
+}
+
+void ExtendedKalmanFilter::setState(const Eigen::VectorXd &newState) {
+    if (newState.size() == this->state.size()) {
+        this->state = newState;
+    } else {
+        throw std::runtime_error("New state size does not match EKF state size");
+    }
 }

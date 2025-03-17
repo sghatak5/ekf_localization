@@ -19,7 +19,10 @@ class ExtendedKalmanFilter{
     pair<Eigen::VectorXd, Eigen::MatrixXd> update(const Eigen::VectorXd &measurement); //Measurement from GPS
     
     const Eigen::VectorXd& getState() const; //Get State
+
+    void setState(const Eigen::VectorXd &state); //Set State
     
+    Eigen::Matrix3d updateRotationMatrix(const Eigen::Vector4d &quaternion);
     private:
     Eigen::VectorXd state; //State
     Eigen::MatrixXd P; //Covariance
@@ -47,7 +50,7 @@ class ExtendedKalmanFilter{
     Eigen::MatrixXd computeJacobianF(const Eigen::VectorXd &imuLinearAcceleration,
                                     const Eigen::VectorXd &imuAngularVelocity);
 
-    Eigen::Matrix3d updateRotationMatrix(const Eigen::Vector4d &quaternion);
+    //Eigen::Matrix3d updateRotationMatrix(const Eigen::Vector4d &quaternion);
 };
 
 #endif 
